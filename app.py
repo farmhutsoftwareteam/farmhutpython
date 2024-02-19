@@ -102,6 +102,8 @@ def ask_assistant():
             )
             status = run.status
 
+            
+
         messages = client.beta.threads.messages.list(
             thread_id=azure_thread_id
         )
