@@ -112,12 +112,17 @@ def process_question_background(question, phone):
 
 @app.route('/get-last-message', methods=['GET'])
 def get_last_message():
-    thread_id = request.args.get('thread_id')
-    if not thread_id:
-        return jsonify({"error": "No thread ID provided"}), 400
+    phone = request.args.get('phone')
+    if not phone:
+        return jsonify({"error": "No phone number  provided"}), 400
 
     try:
         # Fetch all messages from the thread
+        user = mongo.db.users.find_one({"phone" : phone})
+        if not user or 'azureThreadId' not in user :
+            return jsonify({"error" : "user not found or thread is misssing"})
+        
+        thread_id = user['azureThreadId']
         response = client.beta.threads.messages.list(thread_id=thread_id)
         
         # Convert the response to JSON string and then back to a Python object
