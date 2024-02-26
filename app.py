@@ -109,7 +109,41 @@ def process_question_background(question, phone):
      
     
     
+
+@app.route('/get-last-message', methods=['GET'])
+def get_last_message():
+    thread_id = request.args.get('thread_id')
+    if not thread_id:
+        return jsonify({"error": "No thread ID provided"}), 400
+
+    try:
+        # Fetch all messages from the thread
+        response = client.beta.threads.messages.list(thread_id=thread_id)
+        
+        # Convert the response to JSON string and then back to a Python object
+        messages_json_str = response.model_dump_json(indent=2)
+        messages = json.loads(messages_json_str)
+        
+        # Filter messages to find those from the assistant
+        assistant_messages = [msg for msg in messages['data'] if msg['role'] == 'assistant']
+
+        # Assuming messages are already sorted with the latest message first
+        if assistant_messages:
+         latest_message = assistant_messages[0]
     
+    # Assuming there's always at least one text content in the latest_message
+    # and it's the one you're interested in.
+         text_contents = [content['text']['value'] for content in latest_message['content'] if content['type'] == 'text']
+    
+    # If there are multiple text contents, this will just take the first one
+        text_value = text_contents[0] if text_contents else "No text content found"
+    
+        return jsonify({"latest_message_text": text_value}), 200
+
+
+    except Exception as e:
+        logging.error(f"Failed to fetch messages for thread {thread_id}: {str(e)}")
+        return jsonify({"error": "Failed to fetch messages"})
 
 @app.route('/hello')
 def hello_world():
