@@ -5,6 +5,8 @@ from flask import Flask, request, jsonify
 from openai import AzureOpenAI
 import time
 import json
+import requests 
+
 from flask_pymongo import PyMongo
 
 # Configure logging
@@ -20,6 +22,8 @@ client = AzureOpenAI(
     api_version="2024-02-15-preview",
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
 )
+
+WEBHOOK_URL = "https://flows.messagebird.com/flows/invocations/webhooks/dd0acae0-073f-40bb-97b2-3ee23290b7a9"
 
 @app.route('/ask-assistant', methods=['POST'])
 def ask_assistant():
@@ -101,16 +105,44 @@ def ask_assistant():
                 run_id=run.id
             )
             status = run.status
+            logging.info(f"Run status: {status}")
+
+            if status == "completed":
+               webhook_payload ={
+                   "identifier" : phone
+               }
+           
+        response = requests.post(WEBHOOK_URL, json=webhook_payload)
+        logging.info(f"Webhook sent with response status: {response.status_code}")
+        if response.status_code == 200:
+            logging.info("Webhook sent successfully")
+        else:
+            logging.error(f"Failed to send webhook. Status code: {response.status_code}")
+        
+        
+            
 
             
 
         messages = client.beta.threads.messages.list(
             thread_id=azure_thread_id
         )
+        # Find the first assistant response in the messages
+        for message in messages.data:
+            if message.role == "assistant" and message.content:
+                # Assuming each message has a "text" content type you are interested in
+                for content in message.content:
+                    if content.type == "text":
+                        first_text_value = content.text.value
+                        # Return the first text value directly
+                        return jsonify({"response": first_text_value})
+        return jsonify({"response": "No response from assistant"})
+    
+    
 
         # Assuming messages.model_dump_json() returns a JSON serializable Python object
-        response = messages.model_dump_json(indent=2)
-        return jsonify({"response": response})
+        # response = messages.model_dump_json(indent=2)
+        # return jsonify({"response": response})
     except Exception as e:
         logging.error(f"An error occurred: {str(e)}")
         return jsonify({"error": str(e)}), 500
