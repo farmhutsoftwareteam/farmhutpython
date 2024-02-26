@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from openai import AzureOpenAI
 import time
 import json
+from threading import Thread
 import requests 
 
 from flask_pymongo import PyMongo
@@ -35,117 +36,80 @@ def ask_assistant():
     if not question or not phone:
         logging.warning("No question provided in request or phone number")
         return jsonify({"error": "No question provided"}), 400
+    
+    thread = Thread(target=process_question_background, args=(question, phone))
+    thread.start()
+    return jsonify({"message": "Request is being processed"}), 200
 
-    # Check if the user exists and has an azureThreadId
-    user = mongo.db.users.find_one({"phone": phone})
-    if user and user.get('azureThreadId'):
-        azure_thread_id = user['azureThreadId']
-        # Logic to add more messages to the existing thread
-        # You would use the azure_thread_id to interact with the Azure API
-    else:
-        # Logic to create a new thread in Azure and update the user record
-        # This is a placeholder for creating a new thread and getting its ID
-        new_azure_thread_id = client.beta.threads.create()
-        logging.info(new_azure_thread_id)
-        if user:
-            # Update existing user with the new azureThreadId
-            mongo.db.users.update_one(
-                {"_id": user['_id']},
-                {"$set": {"azureThreadId": new_azure_thread_id.id}}
-            )
+def process_question_background(question, phone):
+  try:
+        user = mongo.db.users.find_one({"phone": phone})
+        azure_thread_id = None
+        if user and user.get('azureThreadId'):
+            azure_thread_id = user['azureThreadId']
         else:
-            # Create a new user with the azureThreadId
-            mongo.db.users.insert_one({
-                "phone": phone,
-                "azureThreadId": new_azure_thread_id,
-                # Add other user fields as necessary
-            })
-        
-        azure_thread_id = new_azure_thread_id
-        logging.info(azure_thread_id)
-    try:
+            # Logic to create a new thread in Azure and update the user record
+            thread_response = client.beta.threads.create()
+            azure_thread_id = thread_response.id
+            if user:
+                mongo.db.users.update_one({"_id": user['_id']}, {"$set": {"azureThreadId": azure_thread_id}})
+            else:
+                mongo.db.users.insert_one({"phone": phone, "azureThreadId": azure_thread_id})
+
         # Create an assistant
-        logging.info("Creating assistant")
         assistant = client.beta.assistants.create(
-            model="munyaradzi",  # Or another model you have access to
-            name="Math Assist",
-            instructions="You are an AI assistant ",
+            model="munyaradzi",  # Replace with your actual model name
+            name="umuDhumeni",  # Replace with your assistant's name
+            instructions="You are an AI assistant that is designed to help farmers with their queries, they will ask questions, you will provide them with full responses, these responses will be full, you will ask them to ask you follow up questions making sure everything is properly defined",  # Replace with your instructions
             tools=[]
         )
-        logging.info("Assistant created successfully")
-        
-    
 
-       
+        logging.info('assistant created its okat')
+
+        # Add message to the assistant
         message = client.beta.threads.messages.create(
             thread_id=azure_thread_id,
             role="user",
             content=question
         )
-        logging.info("Message created successfully")
-
+        logging.info("message added to the thread")
+        # Start the assistant (run)
         run = client.beta.threads.runs.create(
             thread_id=azure_thread_id,
             assistant_id=assistant.id
         )
-        logging.info("Run created successfully")
 
-        run = client.beta.threads.runs.retrieve(
+        logging.info('assitant run started')
+        # Wait for the run to complete and check the status
+        run_status = client.beta.threads.runs.retrieve(
             thread_id=azure_thread_id,
             run_id=run.id
-        )
-        logging.info("Run retrieved successfully")
+        ).status
 
-        status = run.status
-
-        while status not in ["completed", "cancelled", "expired", "failed"]:
-            time.sleep(5)
-            run = client.beta.threads.runs.retrieve(
+        while run_status not in ["completed", "cancelled", "expired", "failed"]:
+            time.sleep(5)  # Adjust the sleep time as needed
+            run_status = client.beta.threads.runs.retrieve(
                 thread_id=azure_thread_id,
                 run_id=run.id
-            )
-            status = run.status
-            logging.info(f"Run status: {status}")
+            ).status
 
-            if status == "completed":
-               webhook_payload ={
-                   "identifier" : phone
-               }
-           
-        response = requests.post(WEBHOOK_URL, json=webhook_payload)
-        logging.info(f"Webhook sent with response status: {response.status_code}")
-        if response.status_code == 200:
-            logging.info("Webhook sent successfully")
-        else:
-            logging.error(f"Failed to send webhook. Status code: {response.status_code}")
-        
-        
-            
-
-            
-
-        messages = client.beta.threads.messages.list(
-            thread_id=azure_thread_id
-        )
-        # Find the first assistant response in the messages
-        for message in messages.data:
-            if message.role == "assistant" and message.content:
-                # Assuming each message has a "text" content type you are interested in
-                for content in message.content:
-                    if content.type == "text":
-                        first_text_value = content.text.value
-                        # Return the first text value directly
-                        return jsonify({"response": first_text_value})
-        return jsonify({"response": "No response from assistant"})
+        if run_status == "completed":
+            webhook_payload = {"identifier": phone}
+            try:
+                response = requests.post(WEBHOOK_URL, json=webhook_payload, timeout=10)
+                # Log detailed response information
+                logging.info(f"Webhook sent. Status code: {response.status_code}, Response body: {response.text}")
+                if response.status_code != 200:
+                    logging.error(f"Failed to send webhook. Status code: {response.status_code}, Response: {response.text}")
+            except requests.exceptions.RequestException as e:
+                # This will catch any request-related errors, including timeouts
+                logging.error(f"Request to send webhook failed: {e}")
+  except Exception as e:
+        logging.error(f"An error occurred in background processing: {str(e)}")
+     
     
     
-
-        # Assuming messages.model_dump_json() returns a JSON serializable Python object
-        # response = messages.model_dump_json(indent=2)
-        # return jsonify({"response": response})
-    except Exception as e:
-        logging.error(f"An error occurred: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+    
 
 @app.route('/hello')
 def hello_world():
