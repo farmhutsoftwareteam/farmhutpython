@@ -11,7 +11,8 @@ import threading
 from flask_pymongo import PyMongo
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 app = Flask(__name__)
 app.config["MONGO_URI"] = "mongodb+srv://raysuncapital:ZGJKTn45yyqH6X1y@cluster0.0jein5m.mongodb.net/FARMHUT"
@@ -277,22 +278,21 @@ def process_image_route():
         logging.error(f"An error occurred while processing the image: {str(e)}")
         return jsonify({"error": "An error occurred while processing the image"}), 500
 
-def process_image_with_openai(image_url , phone):
+def process_image_with_openai(image_url, phone):
     """
-    Processes an image using the Azure OpenAI Vision client.
-
+    Processes an image using Azure OpenAI, and sends the result along with the phone number to a webhook.
+    
     Parameters:
     - image_url: The URL of the image to be processed.
-
-    Returns:
-    - The response from the Azure OpenAI Vision model.
+    - phone: The phone number associated with the request.
     """
     try:
-        logging.info('Processing image with OpenAI')
+        logging.info('Starting image processing with OpenAI for URL: %s', image_url)
+        # Process the image with Azure OpenAI
         response = visionClient.chat.completions.create(
             model="munyavision",  # Replace with your actual model name
             messages=[
-                {"role": "system", "content": "You are an image identifying assistant fully describe the image that you will be sent to, the user will ask a follow up question on the image make sure you full answer in depth.."},
+                {"role": "system", "content": "You are an image identifying assistant. Fully describe the image."},
                 {"role": "user", "content": [
                     {"type": "text", "text": "Describe this picture:"},
                     {"type": "image_url", "image_url": {"url": image_url}}
@@ -300,29 +300,24 @@ def process_image_with_openai(image_url , phone):
             ],
             max_tokens=2000
         )
-
         if response.choices:
             message_content = response.choices[0].message.content
-            # Construct a response dictionary
-            response_data = {
-                "message_content": message_content
-            }
+            logging.info('Image processed successfully with content: %s', message_content)
+            # Prepare the webhook data
             webhook_data = {
-            "identifier" : phone,
-            "image_response" : response_data
-        }
-            requests.post(IMAGE_WEBHOOK_URL , webhook_data)
-
-
-            logging.info(f"OpenAI Vision Response: {response_data}")
-            return response_data
+                "identifier": phone,
+                "image_response": message_content
+            }
+            # Send the result to a webhook
+            response = requests.post(IMAGE_WEBHOOK_URL, json=webhook_data)
+            if response.status_code == 200:
+                logging.info('Webhook sent successfully.')
+            else:
+                logging.error('Failed to send webhook. Status code: %s, Response: %s', response.status_code, response.text)
         else:
-            logging.error("No choices available in the response.")
-            return {"error": "No choices available in the response."}
-
+            logging.error('No choices available in the OpenAI response.')
     except Exception as e:
-        logging.error(f"An error occurred while processing the image with OpenAI: {str(e)}")
-        return {"error": str(e)}
+        logging.error('An error occurred while processing the image with OpenAI or sending the webhook: %s', str(e))
 @app.route('/hello')
 def hello_world():
     return 'Hello, World!'
