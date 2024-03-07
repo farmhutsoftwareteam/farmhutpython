@@ -7,7 +7,7 @@ import time
 import json
 from threading import Thread
 import requests 
-
+import threading
 from flask_pymongo import PyMongo
 
 # Configure logging
@@ -36,6 +36,7 @@ client = AzureOpenAI(
 )
 
 WEBHOOK_URL = "https://flows.messagebird.com/flows/invocations/webhooks/dd0acae0-073f-40bb-97b2-3ee23290b7a9"
+IMAGE_WEBHOOK_URL="https://flows.messagebird.com/flows/invocations/webhooks/0570b558-77ea-487e-933b-b1de96356adb"
 
 def process_image_with_openai(image_url):
     """
@@ -64,6 +65,13 @@ def process_image_with_openai(image_url):
 
         # Log the response for debugging
         logging.info(f"OpenAI Vision Response: {response}")
+
+        webhook_data = {
+            "identifier" : "phone",
+            "image_response" : response
+        }
+
+        requests.post(IMAGE_WEBHOOK_URL ,json=webhook_data)
 
         return response
 
@@ -252,17 +260,19 @@ def get_last_message():
 
 @app.route('/process-image', methods=['POST'])
 def process_image_route():
-    data = request.json
-    image_url = data.get('image_url')
-    
-    if not image_url:
-        return jsonify({"error": "No image URL provided"}), 400
-
     try:
-        # Process the image with OpenAI
-        response = process_image_with_openai(image_url)
-        # Assuming the response contains a 'choices' field with the desired content
-        return jsonify(response)
+        data = request.json
+        image_url = data.get('image_url')
+        phone = data.get('phone')
+    
+        if not image_url or not phone:
+            return jsonify({"error": "No image URL provided"}), 400
+
+        # Start the image processing in a background thread
+        threading.Thread(target=process_image_with_openai, args=(image_url, phone)).start()
+
+        # Immediately inform the user that the image is being processed
+        return jsonify({"message": "Image is being processed"}), 202
     except Exception as e:
         logging.error(f"An error occurred while processing the image: {str(e)}")
         return jsonify({"error": "An error occurred while processing the image"}), 500
