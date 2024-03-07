@@ -292,7 +292,7 @@ def process_image_with_openai(image_url , phone):
         response = visionClient.chat.completions.create(
             model="munyavision",  # Replace with your actual model name
             messages=[
-                {"role": "system", "content": "You are aan image identifying assistant fully describe the image that you will be sent to, the user will ask a follow up question on the image make sure you full answer in depth.."},
+                {"role": "system", "content": "You are an image identifying assistant fully describe the image that you will be sent to, the user will ask a follow up question on the image make sure you full answer in depth.."},
                 {"role": "user", "content": [
                     {"type": "text", "text": "Describe this picture:"},
                     {"type": "image_url", "image_url": {"url": image_url}}
