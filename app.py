@@ -38,7 +38,7 @@ client = AzureOpenAI(
 WEBHOOK_URL = "https://flows.messagebird.com/flows/invocations/webhooks/dd0acae0-073f-40bb-97b2-3ee23290b7a9"
 IMAGE_WEBHOOK_URL="https://flows.messagebird.com/flows/invocations/webhooks/0570b558-77ea-487e-933b-b1de96356adb"
 
-def process_image_with_openai(image_url):
+def process_image_with_openai(image_url, phone):
     """
     Processes an image using the Azure OpenAI Vision client.
 
@@ -67,7 +67,7 @@ def process_image_with_openai(image_url):
         logging.info(f"OpenAI Vision Response: {response}")
 
         webhook_data = {
-            "identifier" : "phone",
+            "identifier" : phone,
             "image_response" : response
         }
 
