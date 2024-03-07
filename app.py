@@ -277,7 +277,7 @@ def process_image_route():
         logging.error(f"An error occurred while processing the image: {str(e)}")
         return jsonify({"error": "An error occurred while processing the image"}), 500
 
-def process_image_with_openai(image_url):
+def process_image_with_openai(image_url , phone):
     """
     Processes an image using the Azure OpenAI Vision client.
 
@@ -307,6 +307,13 @@ def process_image_with_openai(image_url):
             response_data = {
                 "message_content": message_content
             }
+            webhook_data = {
+            "identifier" : phone,
+            "image_response" : response_data
+        }
+            requests.post(IMAGE_WEBHOOK_URL , webhook_data)
+
+
             logging.info(f"OpenAI Vision Response: {response_data}")
             return response_data
         else:
