@@ -91,19 +91,30 @@ tools = [
     # Add more functions here as needed
 ]
 
-def handle_tool_requests(client ,thread_id, run_id) :
-    run = client.beta.threads.runs.retrieve(thread_id = thread_id , run_id = run_id)
-    print(run.model_dump_json(indent=2))
-    if run.required_action and run.required_action.type == "submit_tool_outputs" : 
-        tool_outputs = []
-        for call in run.required_action.submit_tool_outputs.tool_calls :
-            if call.function.name == "processImageWithOpenAI" : 
-                image_url = json.loads(call.function.arguments)["image_url"]
-                tool_response = process_image_with_openai(image_url)
-                tool_outputs.append({
-                    "tool_call_id" : call.id,
-                    "output" : tool_response
-                })
+def handle_tool_requests(client, thread_id, run_id):
+    try:
+        run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
+        print(run.model_dump_json(indent=2))
+        if run.required_action and run.required_action.type == "submit_tool_outputs":
+            tool_outputs = []
+            for call in run.required_action.submit_tool_outputs.tool_calls:
+                if call.function.name == "processImageWithOpenAI":
+                    image_url = json.loads(call.function.arguments)["image_url"]
+                    tool_response = process_image_with_openai(image_url)
+                    tool_outputs.append({
+                        "tool_call_id": call.id,
+                        "output": json.dumps(tool_response)
+                    })
+                    logging.info("this is the output", tool_response)
+            # Submit the tool outputs back to Azure OpenAI
+            client.beta.threads.runs.submit_tool_outputs(
+                thread_id=thread_id,
+                run_id=run_id,
+                tool_outputs=tool_outputs
+            )
+    except Exception as e:
+        logging.error(f"An error occurred while submitting tool outputs: {str(e)}")
+
 
 
 @app.route('/ask-assistant', methods=['POST'])
@@ -169,7 +180,7 @@ def process_question_background(question, phone):
         ).status
 
         while run_status not in ["completed", "cancelled", "expired", "failed"]:
-            logging.info("Inside the loop, current run status: {}".format(run_status))
+            logging.info("Inside the loop, current run status" , run_status)
 
 
             run = client.beta.threads.runs.retrieve(thread_id=azure_thread_id, run_id=run.id)
@@ -239,6 +250,62 @@ def get_last_message():
         logging.error(f"Failed to fetch messages for thread {thread_id}: {str(e)}")
         return jsonify({"error": "Failed to fetch messages"})
 
+@app.route('/process-image', methods=['POST'])
+def process_image_route():
+    data = request.json
+    image_url = data.get('image_url')
+    
+    if not image_url:
+        return jsonify({"error": "No image URL provided"}), 400
+
+    try:
+        # Process the image with OpenAI
+        response = process_image_with_openai(image_url)
+        # Assuming the response contains a 'choices' field with the desired content
+        return jsonify(response)
+    except Exception as e:
+        logging.error(f"An error occurred while processing the image: {str(e)}")
+        return jsonify({"error": "An error occurred while processing the image"}), 500
+
+def process_image_with_openai(image_url):
+    """
+    Processes an image using the Azure OpenAI Vision client.
+
+    Parameters:
+    - image_url: The URL of the image to be processed.
+
+    Returns:
+    - The response from the Azure OpenAI Vision model.
+    """
+    try:
+        logging.info('Processing image with OpenAI')
+        response = visionClient.chat.completions.create(
+            model="munyavision",  # Replace with your actual model name
+            messages=[
+                {"role": "system", "content": "You are aan image identifying assistant fully describe the image that you will be sent to, the user will ask a follow up question on the image make sure you full answer in depth.."},
+                {"role": "user", "content": [
+                    {"type": "text", "text": "Describe this picture:"},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]}
+            ],
+            max_tokens=2000
+        )
+
+        if response.choices:
+            message_content = response.choices[0].message.content
+            # Construct a response dictionary
+            response_data = {
+                "message_content": message_content
+            }
+            logging.info(f"OpenAI Vision Response: {response_data}")
+            return response_data
+        else:
+            logging.error("No choices available in the response.")
+            return {"error": "No choices available in the response."}
+
+    except Exception as e:
+        logging.error(f"An error occurred while processing the image with OpenAI: {str(e)}")
+        return {"error": str(e)}
 @app.route('/hello')
 def hello_world():
     return 'Hello, World!'
