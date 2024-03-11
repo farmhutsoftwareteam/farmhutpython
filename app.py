@@ -37,7 +37,7 @@ client = AzureOpenAI(
 )
 
 WEBHOOK_URL = "https://flows.messagebird.com/flows/invocations/webhooks/dd0acae0-073f-40bb-97b2-3ee23290b7a9"
-IMAGE_WEBHOOK_URL="https://flows.messagebird.com/flows/invocations/webhooks/0570b558-77ea-487e-933b-b1de96356adb"
+IMAGE_WEBHOOK_URL="https://flows.messagebird.com/flows/invocations/webhooks/ae1c5391-e2db-4621-9d3e-cc3413c73e09"
 
 def process_image_with_openai(image_url, phone):
     """
