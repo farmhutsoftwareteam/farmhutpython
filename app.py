@@ -21,8 +21,8 @@ load_dotenv()
 
 api_base = "https://imageprocessor.openai.azure.com/"
 vision_api_key = "d9ebcc42d9cf48d9b9ba67a8b7b745d0"
-deployment_name = 'munyavision'
-vison_api_version = '2024-03-01-preview"'
+deployment_name = 'munyavision2'
+vison_api_version = '2024-03-01-preview'
 
 visionClient = AzureOpenAI(
     api_key=vision_api_key,
