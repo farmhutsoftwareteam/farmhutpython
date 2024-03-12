@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import logging
 import os
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify ,send_file ,abort
 from openai import AzureOpenAI
 import time
 import json
@@ -11,7 +11,7 @@ import threading
 from flask_pymongo import PyMongo
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s' ,filename='application.log')
 
 
 app = Flask(__name__)
@@ -347,6 +347,18 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
 @app.route('/hello')
 def hello_world():
     return 'Hello, World!'
+@app.route('/logs')
+def serve_logs():
+    # Implement your authentication logic here to secure this endpoint
+    # For example, check for a session or a token that proves the user is authorized
+    # if not user_is_authorized:
+    #     abort(403)  # Forbidden
+
+    log_file_path = 'application.log'
+    if os.path.exists(log_file_path):
+        return send_file(log_file_path)
+    else:
+        abort(404)  # Not Found
 
 if __name__ == '__main__':
     app.run(debug=False)
