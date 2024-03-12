@@ -20,3 +20,15 @@ If you have any other agricultural questions or need assistance with crop or liv
 
 For future inquiries more relevant to my scope of expertise, which includes identifying diseases or pests affecting crops or livestock in Sub-Saharan Africa, please provide an image of your crop, plant, or animal showing any unusual signs, symptoms, or behavior.
 2024-03-12 10:28:56,325 - ERROR - Failed to send webhook. Status code: 404, Response: No invocation available for webhook ID (ae1c5391-e2db-4621-9d3e-cc3413c73e09)
+2024-03-12 10:39:32,725 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2024-03-12 10:39:32,725 - INFO - [33mPress CTRL+C to quit[0m
+2024-03-12 10:39:46,279 - INFO - Starting image processing with OpenAI for URL: https://messaging.messagebird.com/v1/files/60c7aae1-e8b8-40dd-89b7-79114842ee00
+2024-03-12 10:39:46,279 - INFO - 127.0.0.1 - - [12/Mar/2024 10:39:46] "[35m[1mPOST /process-image HTTP/1.1[0m" 202 -
+2024-03-12 10:39:58,225 - INFO - HTTP Request: POST https://imageprocessor.openai.azure.com/openai/deployments/munyavision2/chat/completions?api-version=2024-03-01-preview "HTTP/1.1 200 OK"
+2024-03-12 10:39:58,232 - INFO - Image processed successfully with content: I'm here to assist with the identification and management of diseases or pests in crops and livestock, as well as providing agricultural advice to farmers in Sub-Saharan Africa. The image you have uploaded seems to be of an onion that has started sprouting, which is not directly relevant to the agricultural support I provide. 
+
+However, if you are a farmer or a producer and the sprouting of onions is a concern for you in terms of crop storage or quality, feel free to upload an image of your stored onions or describe the storage conditions, and I can give you advice on how to better store your onions to prevent premature sprouting.
+
+If you have an image of a diseased or pest-infested plant or animal, or require any other agricultural support, please upload that for analysis and assistance.
+2024-03-12 10:39:59,742 - ERROR - Failed to send webhook. Status code: 404, Response: No invocation available for webhook ID (ae1c5391-e2db-4621-9d3e-cc3413c73e09)
