@@ -10,3 +10,13 @@ The sprouting itself is not harmful, and the onion can still be used. However, t
 
 If you have any other agricultural questions or need assistance with crop or livestock concerns, feel free to send a picture and I'll be more than happy to assist you.
 2024-03-12 10:24:11,046 - ERROR - Failed to send webhook. Status code: 404, Response: No invocation available for webhook ID (ae1c5391-e2db-4621-9d3e-cc3413c73e09)
+2024-03-12 10:28:26,484 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2024-03-12 10:28:26,484 - INFO - [33mPress CTRL+C to quit[0m
+2024-03-12 10:28:40,653 - INFO - Starting image processing with OpenAI for URL: https://messaging.messagebird.com/v1/files/60c7aae1-e8b8-40dd-89b7-79114842ee00
+2024-03-12 10:28:40,654 - INFO - 127.0.0.1 - - [12/Mar/2024 10:28:40] "[35m[1mPOST /process-image HTTP/1.1[0m" 202 -
+2024-03-12 10:28:54,752 - INFO - HTTP Request: POST https://imageprocessor.openai.azure.com/openai/deployments/munyavision2/chat/completions?api-version=2024-03-01-preview "HTTP/1.1 200 OK"
+2024-03-12 10:28:54,761 - INFO - Image processed successfully with content: I'm glad to assist with agricultural queries. However, the picture you've shared shows an onion that's sprouting, which is a natural process rather than a plant disease or disorder. Onions begin to sprout when they are exposed to the right conditions of warmth and moisture. This usually happens when they are not stored properly or when they've been stored for too long. Sprouting onions can still be used in cooking, although they may have a slightly milder flavor. It's best to plant or use them soon as they can lose texture and nutritional value over time.
+
+For future inquiries more relevant to my scope of expertise, which includes identifying diseases or pests affecting crops or livestock in Sub-Saharan Africa, please provide an image of your crop, plant, or animal showing any unusual signs, symptoms, or behavior.
+2024-03-12 10:28:56,325 - ERROR - Failed to send webhook. Status code: 404, Response: No invocation available for webhook ID (ae1c5391-e2db-4621-9d3e-cc3413c73e09)

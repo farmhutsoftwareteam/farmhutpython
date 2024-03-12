@@ -142,13 +142,13 @@ def handle_tool_requests(client, thread_id, run_id):
 
 @app.route('/ask-assistant', methods=['POST'])
 def ask_assistant():
-    logging.info("Received request for /ask-assistant")
+    logger.info("Received request for /ask-assistant")
     data = request.json
     question = data.get('question')
     phone=data.get('phone')
 
     if not question or not phone:
-        logging.warning("No question provided in request or phone number")
+        logger.warning("No question provided in request or phone number")
         return jsonify({"error": "No question provided"}), 400
     
     thread = Thread(target=process_question_background, args=(question, phone))
@@ -303,7 +303,7 @@ def process_image_with_openai(image_url, phone, question):
     - question: The question or prompt associated with the image processing request.
     """
     try:
-        logging.info('Starting image processing with OpenAI for URL: %s', image_url)
+        logger.info('Starting image processing with OpenAI for URL: %s', image_url)
 
         system_message = """
 You are an advanced AI assistant with specialized expertise in supporting agricultural activities in Sub-Saharan Africa. Your role is to analyze images submitted by farmers of their crops, plants, animals, and even animal feces to detect diseases, pests, anomalies, or any signs of stress. When providing advice, consider the local context, availability of resources, and the typical practices of the region to ensure your recommendations are practical and feasible. Here are your detailed responsibilities:
@@ -342,7 +342,7 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
         )
         if response.choices:
             message_content = response.choices[0].message.content
-            logging.info('Image processed successfully with content: %s', message_content)
+            logger.info('Image processed successfully with content: %s', message_content)
             # Prepare the webhook data
             webhook_data = {
                 "identifier": phone,
@@ -351,13 +351,13 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
             # Send the result to a webhook
             response = requests.post(IMAGE_WEBHOOK_URL, json=webhook_data)
             if response.status_code == 200:
-                logging.info('Webhook sent successfully.')
+                logger.info('Webhook sent successfully.')
             else:
-                logging.error('Failed to send webhook. Status code: %s, Response: %s', response.status_code, response.text)
+                logger.error('Failed to send webhook. Status code: %s, Response: %s', response.status_code, response.text)
         else:
             logging.error('No choices available in the OpenAI response.')
     except Exception as e:
-        logging.error('An error occurred while processing the image with OpenAI or sending the webhook: %s', str(e))
+        logger.error('An error occurred while processing the image with OpenAI or sending the webhook: %s', str(e))
 @app.route('/hello')
 def hello_world():
     return 'Hello, World!'
