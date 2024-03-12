@@ -1,0 +1,12 @@
+2024-03-12 10:23:19,279 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2024-03-12 10:23:19,279 - INFO - [33mPress CTRL+C to quit[0m
+2024-03-12 10:23:51,987 - INFO - Starting image processing with OpenAI for URL: https://messaging.messagebird.com/v1/files/60c7aae1-e8b8-40dd-89b7-79114842ee00
+2024-03-12 10:23:51,987 - INFO - 127.0.0.1 - - [12/Mar/2024 10:23:51] "[35m[1mPOST /process-image HTTP/1.1[0m" 202 -
+2024-03-12 10:24:09,475 - INFO - HTTP Request: POST https://imageprocessor.openai.azure.com/openai/deployments/munyavision2/chat/completions?api-version=2024-03-01-preview "HTTP/1.1 200 OK"
+2024-03-12 10:24:09,510 - INFO - Image processed successfully with content: The image you have provided is of an onion that has begun to sprout. The green shoots emerging from the top of the onion are an indication that the onion is trying to grow. Sprouting occurs when the onion is exposed to favorable conditions, such as warmth and moisture, which are signals for the plant to grow. This is a natural process but it does mean that the onion is no longer at its peak for culinary use.
+
+The sprouting itself is not harmful, and the onion can still be used. However, the texture and flavor might not be as optimal as a fresh onion. In case you want to prevent your onions from sprouting, you should store them in a cool, dry, and dark place with good air circulation to avoid moisture buildup and warmth that can signal the onion to start growing.
+
+If you have any other agricultural questions or need assistance with crop or livestock concerns, feel free to send a picture and I'll be more than happy to assist you.
+2024-03-12 10:24:11,046 - ERROR - Failed to send webhook. Status code: 404, Response: No invocation available for webhook ID (ae1c5391-e2db-4621-9d3e-cc3413c73e09)

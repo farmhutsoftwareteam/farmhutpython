@@ -9,6 +9,20 @@ from threading import Thread
 import requests 
 import threading
 from flask_pymongo import PyMongo
+from loggly.handlers import HTTPSHandler
+from logging import Formatter
+
+
+LOGGLY_TOKEN = '8c576ebb-24fa-411c-81b7-5cd46ca3b5ab'
+logger = logging.getLogger('loggly')
+logger.setLevel(logging.INFO)
+loggly_handler = HTTPSHandler(f'https://logs-01.loggly.com/inputs/{LOGGLY_TOKEN}/tag/python', 'POST')
+loggly_handler.setFormatter(Formatter('%(asctime)s %(levelname)s: %(message)s'))
+logger.addHandler(loggly_handler)
+logger.info('loggly handler added')
+
+
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s' ,filename='application.log')
