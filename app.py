@@ -13,6 +13,7 @@ from loggly.handlers import HTTPSHandler
 from logging import Formatter
 
 
+
 LOGGLY_TOKEN = '8c576ebb-24fa-411c-81b7-5cd46ca3b5ab'
 logger = logging.getLogger('loggly')
 logger.setLevel(logging.INFO)
@@ -53,90 +54,44 @@ client = AzureOpenAI(
 WEBHOOK_URL = "https://flows.messagebird.com/flows/invocations/webhooks/dd0acae0-073f-40bb-97b2-3ee23290b7a9"
 IMAGE_WEBHOOK_URL="https://flows.messagebird.com/flows/invocations/webhooks/ae1c5391-e2db-4621-9d3e-cc3413c73e09"
 
-def process_image_with_openai(image_url, phone):
-    """
-    Processes an image using the Azure OpenAI Vision client.
 
-    Parameters:
-    - image_url: The URL of the image to be processed.
 
-    Returns:
-    - The response from the Azure OpenAI Vision model.
-    """
-    try:
-        # Construct the request payload with the provided image URL
-        logging.info('processing image with openai')
-        response = visionClient.chat.completions.create(
-            model="munyavision",
-            messages=[
-                {"role": "system", "content": "You are an image identification assistant, you will identify what is in the image and inform the user."},
-                {"role": "user", "content": [
-                    {"type": "text", "text": "Describe this picture:"},
-                    {"type": "image_url", "image_url": {"url": image_url}}  # Use the passed image URL here
-                ]}
-            ],
-            
-        )
 
-        # Log the response for debugging
-        logging.info(f"OpenAI Vision Response: {response}")
-
-        webhook_data = {
-            "identifier" : phone,
-            "image_response" : response
-        }
-
-        requests.post(IMAGE_WEBHOOK_URL ,json=webhook_data)
-
-        return response
-
-    except Exception as e:
-        logging.error(f"An error occurred while processing the image with OpenAI: {str(e)}")
-        return None
-    
-
-    # Define the tools array
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "processImageWithOpenAI",
-            "description": "Process an image and describe its contents",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "image_url": {"type": "string", "description": "The URL of the image to be processed"}
-                },
-                "required": ["image_url"]
-            }
-        }
-    },
-    # Add more functions here as needed
-]
-
-def handle_tool_requests(client, thread_id, run_id):
+def handle_tool_requests(client, thread_id, run_id, phone, question):
     try:
         run = client.beta.threads.runs.retrieve(thread_id=thread_id, run_id=run_id)
-        print(run.model_dump_json(indent=2))
+        
         if run.required_action and run.required_action.type == "submit_tool_outputs":
             tool_outputs = []
             for call in run.required_action.submit_tool_outputs.tool_calls:
-                if call.function.name == "processImageWithOpenAI":
-                    image_url = json.loads(call.function.arguments)["image_url"]
-                    tool_response = process_image_with_openai(image_url)
-                    tool_outputs.append({
-                        "tool_call_id": call.id,
-                        "output": json.dumps(tool_response)
-                    })
-                    logging.info("this is the output", tool_response)
-            # Submit the tool outputs back to Azure OpenAI
-            client.beta.threads.runs.submit_tool_outputs(
-                thread_id=thread_id,
-                run_id=run_id,
-                tool_outputs=tool_outputs
-            )
+                if call.function.name == "process_image_with_openai":
+                    args = json.loads(call.function.arguments)
+                    image_url = args["image_url"]
+                    phone = args["phone"]  # Ensure phone number is correctly passed
+                    question = args.get('question')
+                    
+                    tool_response = process_image_with_openai(image_url, phone, question)
+                    if tool_response:
+                        tool_outputs.append({
+                            "tool_call_id": call.id,
+                            "output": json.dumps(tool_response)
+                        })
+                    else:
+                        logging.error(f"No response from process_image_with_openai for tool_call_id={call.id}")
+            
+            if tool_outputs:
+                # Submit the tool outputs back to Azure OpenAI
+                submission_response = client.beta.threads.runs.submit_tool_outputs(
+                    thread_id=thread_id,
+                    run_id=run_id,
+                    tool_outputs=tool_outputs
+                )
+                logging.info(f"Tool outputs submitted successfully for thread_id={thread_id}, run_id={run_id}")
+            else:
+                logging.error(f"No tool outputs to submit for thread_id={thread_id}, run_id={run_id}")
     except Exception as e:
-        logging.error(f"An error occurred while submitting tool outputs: {str(e)}")
+        logging.error(f"An error occurred while handling tool requests for thread_id={thread_id}, run_id={run_id}: {str(e)}")
+
 
 
 
@@ -155,7 +110,7 @@ def ask_assistant():
     thread.start()
     return jsonify({"message": "Request is being processed"}), 200
 
-def process_question_background(question, phone):
+def process_question_background(question, phone ):
   try:
         user = mongo.db.users.find_one({"phone": phone})
         azure_thread_id = None
@@ -174,8 +129,23 @@ def process_question_background(question, phone):
         assistant = client.beta.assistants.create(
             model="munyaradzi",  # Replace with your actual model name
             name="umuDhumeni",  # Replace with your assistant's name
-            instructions="You are an AI assistant that is designed to help farmers with their queries, they will ask questions, you will provide them with full responses, these responses will be full, you will ask them to ask you follow up questions making sure everything is properly defined ,if a user sends you an image url you will call tjhe function to process that image. If a user sends an image URL, call the `processImageWithOpenAI` tool. Insert the image description generated by the tool into your response, followed by a prompt asking the user for further questions or clarification about the image. ",  # Replace with your instructions
-            tools= tools
+            instructions="You are an AI assistant that is designed to help farmers with their queries, they will ask questions, you will provide them with full responses, these responses will be full, you will ask them to ask you follow up questions making sure everything is properly defined ,if a user sends you an image url you will call the function to process that image. If a user sends an image URL, call the process_image_with_openai tool. Insert the image description generated by the tool into your response, followed by a prompt asking the user for further questions or clarification about the image.Always make sure you identify the user's phone number in the request as this is key to the success of everything we are doing ",  # Replace with your instructions
+            tools=[{
+      "type": "function",
+      "function": {
+          "name": "process_image_with_openai",
+          "description": "Processes an image and provides information.",
+          "parameters": {
+              "type": "object",
+              "properties": {
+                  "image_url": {"type": "string", "description": "The URL of the image to be processed"},
+                  "phone": {"type": "string", "description": "The phone number associated with the request"},
+                  "question": {"type": "string", "description": "The question or prompt associated with the image processing request"}
+              },
+              "required": ["image_url", "phone", "question"]
+          }
+      }
+  }]
         )
 
         logging.info('assistant created its okat')
@@ -209,7 +179,11 @@ def process_question_background(question, phone):
             run = client.beta.threads.runs.retrieve(thread_id=azure_thread_id, run_id=run.id)
 
             if run.required_action and run.required_action.type == "submit_tool_outputs":
-              handle_tool_requests(client, azure_thread_id, run.id)
+              handle_tool_requests(client, azure_thread_id, run.id ,phone ,question)
+
+            run_status = client.beta.threads.runs.retrieve(thread_id=azure_thread_id, run_id=run.id).status
+
+        else :
             time.sleep(5)  # Adjust the sleep time as needed
             run_status = client.beta.threads.runs.retrieve(
                 thread_id=azure_thread_id,
@@ -304,6 +278,7 @@ def process_image_with_openai(image_url, phone, question):
     """
     try:
         logger.info('Starting image processing with OpenAI for URL: %s', image_url)
+        logging.info(f"Calling process_image_with_openai with image_url: {image_url}, phone: {phone}, question: {question}")
 
         system_message = """
 You are an advanced AI assistant with specialized expertise in supporting agricultural activities in Sub-Saharan Africa. Your role is to analyze images submitted by farmers of their crops, plants, animals, and even animal feces to detect diseases, pests, anomalies, or any signs of stress. When providing advice, consider the local context, availability of resources, and the typical practices of the region to ensure your recommendations are practical and feasible. Here are your detailed responsibilities:
@@ -343,13 +318,17 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
         if response.choices:
             message_content = response.choices[0].message.content
             logger.info('Image processed successfully with content: %s', message_content)
+            logging.info('Image processed successfully with content: %s', str(message_content))
+
             # Prepare the webhook data
             webhook_data = {
                 "identifier": phone,
                 "image_response": message_content
             }
+
             # Send the result to a webhook
             response = requests.post(IMAGE_WEBHOOK_URL, json=webhook_data)
+            
             if response.status_code == 200:
                 logger.info('Webhook sent successfully.')
             else:
