@@ -248,15 +248,32 @@ def process_question_background(question, phone, app):
                     perform_required_actions(client, azure_thread_id, run.id)
                 
                 if status == "completed":
-                 logging.info("Run completed, sending webhook with the latest message.")
-                send_webhook_with_latest_message(client, azure_thread_id, phone)
+                    logging.info("Run completed, processing messages.")
+
+                    # Retrieve the list of messages from the thread after completion
+                    messages_response = client.beta.threads.messages.list(thread_id=azure_thread_id)
+                    messages = messages_response.data if messages_response else []
+                    
+                    # Find the most recent assistant message
+                    latest_assistant_message = None
+                    for message in messages:
+                        if message.role == 'assistant':
+                            latest_assistant_message = message
+                            break  # Since we are assuming the first message in the list is the latest one
+
+                    if latest_assistant_message:
+                        logging.info(f"Latest assistant message: {latest_assistant_message.content[0].text.value}")
+                        message_content = latest_assistant_message.content[0].text.value
+                        send_webhook_with_latest_message(client, azure_thread_id, phone, message_content)
+            else:
+                logging.error("No latest assistant message found.")
                 
 
             # Retrieve the list of messages from the thread after completion
             messages = client.beta.threads.messages.list(thread_id=azure_thread_id)
             logging.info(f"Messages retrieved: {messages}")
-            print(messages)
-            return messages
+            print(latest_assistant_message)
+            return latest_assistant_message
         except Exception as e:
             logging.error(f"An error occurred: {e}")
             return None
@@ -310,28 +327,17 @@ def perform_required_actions(client, thread_id, run_id):
     else:
         logging.info("No required action found.")
 
-def send_webhook_with_latest_message(client, thread_id, phone):
-    try:
-        messages = client.beta.threads.messages.list(thread_id=thread_id)
-        if messages:
-            # Assuming the latest message directed to the user is at the end of the list
-            latest_message = next((msg for msg in reversed(messages.data) if msg.role == 'user'), None)
-            if latest_message:
-                response_content = latest_message.content[0].text.value if latest_message.content else "No content"
-                webhook_data = {
-                    "response": response_content,
-                    "identifier": phone
-                }
-                webhook_url = "https://flows.messagebird.com/flows/invocations/webhooks/dd0acae0-073f-40bb-97b2-3ee23290b7a9"
-                response = requests.post(webhook_url, json=webhook_data, headers={'Content-Type': 'application/json'})
-                
-                if response.status_code == 200:
-                    logging.info("Webhook sent successfully.")
-                else:
-                    logging.error(f"Failed to send webhook, status code: {response.status_code}")
-            else:
-                logging.error("No latest user-directed message found in the thread.")
-        else:
-            logging.error("No messages found in the thread.")
-    except Exception as e:
-        logging.error(f"An error occurred while sending the webhook: {e}")
+def send_webhook_with_latest_message(client, thread_id, phone, message_content):
+    # Set up your webhook data and headers
+    webhook_data = {
+        "response": message_content,
+        "identifier": phone
+    }
+    headers = {'Content-Type': 'application/json'}
+
+    # Send the webhook
+    response = requests.post(Config.WEBHOOK_URL, json=webhook_data, headers=headers)
+    if response.status_code == 200:
+        logging.info("Webhook sent successfully.")
+    else:
+        logging.error(f"Failed to send webhook, status code: {response.status_code} - Response: {response.text}")
