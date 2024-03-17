@@ -62,7 +62,7 @@ def ask_assistant():
     return jsonify({"message": "Request is being processed"}), 200
 
 def hello_world():
-    return 'Hello, World!'
+    return 'Hello, World! New server Running BiTCHES'
 def serve_logs():
     # Implement your authentication logic here to secure this endpoint
     # For example, check for a session or a token that proves the user is authorized
