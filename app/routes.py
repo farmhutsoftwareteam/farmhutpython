@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from .functions import ask_assistant,  serve_logs, hello_world ,process_image_with_openai
+from .functions import ask_assistant,  serve_logs, hello_world ,process_image_with_openai ,search_truckers
 
 main = Blueprint('main', __name__)
 
@@ -11,6 +11,18 @@ def hello():
 def ask():
     
     return ask_assistant()
+
+@main.route('/search-trucks', methods=['POST'])
+def search_trucks():
+    data = request.json
+    location = data.get('location')
+    size = data.get('size', 5)  # Default size to 0 if not provided
+
+    if not location:
+        return jsonify({"error": "Location parameter is required"}), 400
+
+    result = search_truckers(location, size)
+    return jsonify(result)
 
 
 @main.route('/process-image', methods=['POST'])

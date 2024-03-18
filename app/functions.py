@@ -206,7 +206,7 @@ def process_question_background(question, phone, app):
                         "type": "function",
                         "function": {
                             "name": "fetch_weather",
-                            "description": "Fetches weather information for a given location.",
+                            "description": "Fetches current weather based on a user's location.",
                             "parameters": {
                                 "type": "object",
                                 "properties": {
@@ -216,6 +216,21 @@ def process_question_background(question, phone, app):
                             }
                         }
                     },
+                     {
+                "type": "function",
+                "function": {
+                    "name": "search_truckers",
+                    "description": "Searches for truckers based on location and size.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "location": {"type": "string", "description": "Location to search for truckers"},
+                            "size": {"type": "string", "description": "Minimum truck size required"}
+                        },
+                        "required": ["location", "size"]
+                    }
+                }
+            },
                     {"type": "code_interpreter"}
                 ]
             )
@@ -282,8 +297,7 @@ def process_question_background(question, phone, app):
         
      
 
-import json
-import logging
+
 
 def perform_required_actions(client, thread_id, run_id):
     logging.info(f"Retrieving run for thread_id={thread_id} and run_id={run_id}")
@@ -296,23 +310,24 @@ def perform_required_actions(client, thread_id, run_id):
         tool_outputs = []
         for call in run.required_action.submit_tool_outputs.tool_calls:
             func_name = call.function.name
-            function_arguments_str = call.function.arguments
+            function_arguments = json.loads(call.function.arguments)
             logging.info(f"Function name: {func_name}")
-            logging.info(f"Function arguments before processing: {function_arguments_str}")
+            logging.info(f"Function arguments: {function_arguments}")
 
             try:
-                function_arguments = json.loads(function_arguments_str)
-                logging.info(f"Function arguments for {func_name}: {function_arguments}")
-
                 if func_name == "fetch_weather":
                     location = function_arguments["location"]
                     logging.info(f"Fetching weather for location: {location}")
-
                     output = fetch_weather(location)
-                    tool_outputs.append({
-                        "tool_call_id": call.id,
-                        "output": json.dumps(output)
-                    })
+                    tool_outputs.append({"tool_call_id": call.id, "output": json.dumps(output)})
+
+                elif func_name == "search_truckers":
+                    location = function_arguments["location"]
+                    size = function_arguments["size"]
+                    logging.info(f"Searching truckers in location: {location} with size: {size}")
+                    output = search_truckers(location, size)
+                    tool_outputs.append({"tool_call_id": call.id, "output": json.dumps(output)})
+
             except Exception as e:
                 logging.error(f"Error in {func_name}: {e}")
 
@@ -329,6 +344,7 @@ def perform_required_actions(client, thread_id, run_id):
     else:
         logging.info("No required action found.")
 
+
 def send_webhook_with_latest_message(client, thread_id, phone, message_content):
     # Set up your webhook data and headers
     webhook_data = {
@@ -343,3 +359,40 @@ def send_webhook_with_latest_message(client, thread_id, phone, message_content):
         logging.info("Webhook sent successfully.")
     else:
         logging.error(f"Failed to send webhook, status code: {response.status_code} - Response: {response.text}")
+
+
+
+def search_truckers(location, size):
+    try:
+        with open('data/truckers.json', 'r') as file:
+            truckers = json.load(file)
+
+        # Ensure size is a float or 0 if not provided
+        try:
+            size = float(size) if size else 0
+        except ValueError:
+            logging.error("Size must be a number.")
+            return {"error": "Size must be a number."}
+
+        matched_truckers = []
+        for trucker in truckers:
+            trucker_size = trucker.get('Size(tonnes)', 0)
+            
+            try:
+                trucker_size = float(trucker_size) if trucker_size else 0
+            except ValueError:
+                logging.error(f"Invalid size value in truckers data: {trucker_size}")
+                continue
+
+            if trucker['Location'].lower() == location.lower() and trucker_size >= size:
+                matched_truckers.append(trucker)
+
+        if matched_truckers:
+            logging.info(f"Found {len(matched_truckers)} truckers matching criteria in {location} with size {size}.")
+            return matched_truckers
+        else:
+            logging.info(f"No truckers found matching criteria in {location} with size {size}.")
+            return {"message": "No truckers found matching your criteria."}
+    except Exception as e:
+        logging.error(f"An error occurred while searching truckers: {e}")
+        return {"error": "An error occurred while processing your request."}
