@@ -219,7 +219,8 @@ Invite users to share more about their farming situation so you can provide pers
                                 "required": ["location"]
                             }
                         }
-                    }
+                    },
+                    {"type": "code_interpreter"}
                 ]
             )
 
