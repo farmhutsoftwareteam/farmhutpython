@@ -76,18 +76,10 @@ def serve_logs():
         abort(404)  # Not Found
 
 def process_image_with_openai(image_url, phone, question):
-    """
-    Processes an image using Azure OpenAI, and sends the result along with the phone number to a webhook.
-    
-    Parameters:
-    - image_url: The URL of the image to be processed.
-    - phone: The phone number associated with the request.
-    - question: The question or prompt associated with the image processing request.
-    """
     try:
-     
-        logging.info(f"Calling process_image_with_openai with image_url: {image_url}, phone: {phone}, question: {question}")
+        logging.info(f"Processing image with URL: {image_url}, for phone: {phone}")
 
+        # Your system message logic here...
         system_message = """
 You are an advanced AI assistant with specialized expertise in supporting agricultural activities in Sub-Saharan Africa. Your role is to analyze images submitted by farmers of their crops, plants, animals, and even animal feces to detect diseases, pests, anomalies, or any signs of stress. When providing advice, consider the local context, availability of resources, and the typical practices of the region to ensure your recommendations are practical and feasible. Here are your detailed responsibilities:
 
@@ -123,9 +115,9 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
             ],
             max_tokens=2000
         )
+
         if response.choices:
             message_content = response.choices[0].message.content
-            
             logging.info('Image processed successfully with content: %s', str(message_content))
 
             # Prepare the webhook data
@@ -135,17 +127,19 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
             }
 
             # Send the result to a webhook
-            response = requests.post(Config.IMAGE_WEBHOOK_URL, json=webhook_data)
+            webhook_url = 'https://flows.messagebird.com/flows/invocations/webhooks/ae1c5391-e2db-4621-9d3e-cc3413c73e09'
+            webhook_response = requests.post(webhook_url, json=webhook_data)
 
-            
-            if response.status_code == 200:
-               logging.info('webhook sent')
+            if webhook_response.status_code == 200:
+                logging.info('Webhook sent successfully.')
             else:
-                logging
+                logging.error(f'Failed to send webhook, status code: {webhook_response.status_code}, response: {webhook_response.text}')
+
         else:
             logging.error('No choices available in the OpenAI response.')
+
     except Exception as e:
-        logging.info('An error occurred while processing the image with OpenAI or sending the webhook: %s', str(e))
+        logging.error(f'An error occurred while processing the image or sending the webhook: {e}')
 
 
 def process_question_background(question, phone, app):

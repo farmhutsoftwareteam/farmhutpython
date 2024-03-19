@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify
+from threading import Thread
+
 from .functions import ask_assistant,  serve_logs, hello_world ,process_image_with_openai ,search_truckers
 
 main = Blueprint('main', __name__)
@@ -27,7 +29,6 @@ def search_trucks():
 
 @main.route('/process-image', methods=['POST'])
 def process_image_route():
-    # Extract data from the incoming request
     data = request.json
     image_url = data.get('image_url')
     phone = data.get('phone')
@@ -36,8 +37,10 @@ def process_image_route():
     if not image_url or not phone:
         return jsonify({"error": "Missing image URL or phone number"}), 400
     
-    # Call the function to process the image and return the response
-    return process_image_with_openai(image_url, phone, question)
+    # Start the background processing
+    Thread(target=process_image_with_openai, args=(image_url, phone, question)).start()
+    
+    return jsonify({"message": "Image being processed"}), 200
 
 @main.route('/logs', methods=['GET'])
 def logs():
