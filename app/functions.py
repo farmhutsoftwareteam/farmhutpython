@@ -180,22 +180,7 @@ def process_question_background(question, phone, app):
                                 Invite users to share more about their farming situation so you can provide personalized recommendations. Conclude your interactions by encouraging further questions, emphasizing that your purpose is to assist them with knowledge that translates into tangible benefits for their farms and community well-being.
 """,
                 tools=[
-                    {
-                        "type": "function",
-                        "function": {
-                            "name": "process_image_with_openai",
-                            "description": "Processes an image and provides information.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "image_url": {"type": "string", "description": "The URL of the image to be processed"},
-                                    "phone": {"type": "string", "description": "The phone number associated with the request"},
-                                    "question": {"type": "string", "description": "The question or prompt associated with the image processing request"}
-                                },
-                                "required": ["image_url", "phone", "question"]
-                            }
-                        }
-                    },
+                   
                     {
                         "type": "function",
                         "function": {
@@ -225,6 +210,28 @@ def process_question_background(question, phone, app):
                     }
                 }
             },
+            {
+    "type": "function",
+    "function": {
+        "name": "process_image_for_function_calling",
+        "description": "Processes an image and returns the analysis result.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "image_url": {
+                    "type": "string",
+                    "description": "The URL of the image to be processed"
+                },
+                "question": {
+                    "type": "string",
+                    "description": "The question or prompt associated with the image processing request"
+                }
+            },
+            "required": ["image_url", "question"]
+        }
+    }
+},
+
                     {"type": "code_interpreter"}
                 ]
             )
@@ -322,6 +329,13 @@ def perform_required_actions(client, thread_id, run_id):
                     output = search_truckers(location, size)
                     tool_outputs.append({"tool_call_id": call.id, "output": json.dumps(output)})
 
+                elif func_name == "process_image_for_function_calling":
+                    image_url = function_arguments["image_url"]
+                    question = function_arguments["question"]
+                    logging.info(f"Processing image for function calling with URL: {image_url} and question: {question}")
+                    output = process_image_for_function_calling(image_url, question)
+                    tool_outputs.append({"tool_call_id": call.id, "output": json.dumps(output)})
+
             except Exception as e:
                 logging.error(f"Error in {func_name}: {e}")
 
@@ -337,6 +351,8 @@ def perform_required_actions(client, thread_id, run_id):
             logging.warning("No tool outputs to submit.")
     else:
         logging.info("No required action found.")
+
+
 
 
 def send_webhook_with_latest_message(client, thread_id, phone, message_content):
@@ -390,3 +406,57 @@ def search_truckers(location, size):
     except Exception as e:
         logging.error(f"An error occurred while searching truckers: {e}")
         return {"error": "An error occurred while processing your request."}
+
+
+def process_image_for_function_calling(image_url, question):
+    try:
+        logging.info(f"Processing image with URL: {image_url} for question: {question}")
+
+        # Placeholder for the system message
+        system_message = """
+You are an advanced AI assistant with specialized expertise in supporting agricultural activities in Sub-Saharan Africa. Your role is to analyze images submitted by farmers of their crops, plants, animals, and even animal feces to detect diseases, pests, anomalies, or any signs of stress. When providing advice, consider the local context, availability of resources, and the typical practices of the region to ensure your recommendations are practical and feasible. Here are your detailed responsibilities:
+
+1.⁠ ⁠Disease Identification: Use your knowledge to identify diseases or pests affecting crops or livestock. Given the diversity of agriculture in Sub-Saharan Africa, focus on common and significant threats in the region.
+
+2.⁠ ⁠Symptom Analysis: Clearly describe the symptoms observed in the image. Provide insights into additional symptoms farmers should monitor, considering local crop varieties and livestock breeds.
+
+3.⁠ ⁠Treatment Recommendations: When suggesting treatments, prioritize solutions that are accessible and sustainable in Sub-Saharan Africa. Include natural remedies, locally available chemicals, and methods that align with traditional farming practices. Specify the names of chemicals (when necessary), dosages, and safe application methods, emphasizing environmental and user safety.
+
+4.⁠ ⁠Preventative Measures: Offer advice on preventative strategies that are feasible within the local agricultural context, such as crop rotation, natural pest control methods, and soil health practices that suit the region's climate and resources.
+
+5.⁠ ⁠Image Quality Feedback: If an image lacks clarity for accurate analysis, guide the farmer on capturing a better picture, considering the challenges they might face in terms of technology and connectivity.
+
+6.⁠ ⁠Local Resources and Location-Based Sourcing: Based on the provided location, inform the farmer about nearby resources for obtaining treatments—this could be local agrovet shops, community cooperatives, or regional agricultural extension services known to provide support to farmers in Sub-Saharan Africa.
+
+7.⁠ ⁠Follow-Up Encouragement: Encourage ongoing communication by asking the farmer to share updates after implementing your advice. Be prepared to offer additional guidance based on their feedback and further developments.
+
+8.⁠ ⁠If a farmer uploads an image that is not within our scope please tell them the purpose of the assistant and ask them to kindly provide a more relevant image.
+
+Your communication should be clear, respectful, and mindful of the knowledge level and linguistic diversity of farmers in Sub-Saharan Africa. Adapt your language to match the way the question was asked, ensuring your advice is both understandable and actionable. Your ultimate goal is to empower farmers in Sub-Saharan Africa with knowledge and solutions that enhance their resilience, productivity, and sustainability.
+
+"""
+
+        # Process the image with Azure OpenAI
+        response = visionClient.chat.completions.create(
+            model="munyavision",  # Your actual model name
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": [
+                    {"type": "text", "text": question},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]}
+            ],
+            max_tokens=2000  # Adjust as needed
+        )
+
+        if response.choices:
+            message_content = response.choices[0].message.content
+            logging.info('Image processed successfully with content: %s', message_content)
+            return message_content
+        else:
+            logging.error('No choices available in the OpenAI response.')
+            return "No results found for the image analysis."
+
+    except Exception as e:
+        logging.error(f'An error occurred while processing the image: {e}')
+        return f"An error occurred: {str(e)}"
