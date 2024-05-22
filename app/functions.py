@@ -7,6 +7,14 @@ import json
 import time
 import os
 from openai import AzureOpenAI
+from PIL import Image
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from pdf2image import convert_from_path
+import fitz  # PyMuPDF
+import io
+
+
 
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -141,6 +149,137 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
     except Exception as e:
         logging.error(f'An error occurred while processing the image or sending the webhook: {e}')
 
+
+  
+
+def convert_image_to_pdf(image_path, pdf_path):
+    try:
+        # Open the image file
+        image = Image.open(image_path)
+        
+        # Create a canvas object
+        c = canvas.Canvas(pdf_path, pagesize=letter)
+        
+        # Get the dimensions of the image
+        width, height = image.size
+        
+        # Set the dimensions of the PDF to match the image
+        c.setPageSize((width, height))
+        
+        # Draw the image on the canvas
+        c.drawImage(image_path, 0, 0, width, height)
+        
+        # Save the PDF
+        c.save()
+        
+        logging.info(f"Image {image_path} successfully converted to PDF {pdf_path}")
+        return pdf_path
+    except Exception as e:
+        logging.error(f"An error occurred while converting the image to PDF: {e}")
+        return None        
+    
+def pdf_to_images_from_url(pdf_url, output_folder):
+    try:
+        # Download the PDF file
+        response = requests.get(pdf_url)
+        pdf_path = os.path.join(output_folder, "temp.pdf")
+        with open(pdf_path, 'wb') as f:
+            f.write(response.content)
+
+        # Open the PDF file
+        pdf_document = fitz.open(pdf_path)
+        image_files = []
+
+        # Convert each page to an image
+        for page_number in range(len(pdf_document)):
+            page = pdf_document.load_page(page_number)  # Load the page
+            pix = page.get_pixmap()  # Render the page to an image
+
+            image_file = os.path.join(output_folder, f"page_{page_number + 1}.png")
+            pix.save(image_file)
+            image_files.append(image_file)
+
+        logging.info(f"PDF {pdf_url} successfully converted to images")
+        return image_files
+    except Exception as e:
+        logging.error(f"An error occurred while converting PDF to images: {e}")
+        return None
+
+
+
+def process_image_with_openai_simple(image_url, question="Define this image, please"):
+    try:
+        logging.info(f"Processing image with URL: {image_url}")
+
+        # System message for the AI assistant
+        system_message = "Define this image, please."
+
+        # Process the image with Azure OpenAI
+        response = visionClient.chat.completions.create(
+            model="munyavision",  # Replace with your actual model name
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": [
+                    {"type": "text", "text": question},
+                    {"type": "image_url", "image_url": {"url": image_url}}
+                ]}
+            ],
+            max_tokens=2000
+        )
+
+        if response.choices:
+            message_content = response.choices[0].message.content
+            logging.info('Image processed successfully with content: %s', message_content)
+            return message_content
+        else:
+            logging.error('No choices available in the OpenAI response.')
+            return "No results found for the image analysis."
+
+    except Exception as e:
+        logging.error(f'An error occurred while processing the image: {e}')
+        return f"An error occurred: {str(e)}"
+    
+
+def pdf_to_combined_image_from_url(pdf_url, output_folder, combined_image_filename="combined_image.png"):
+    try:
+        # Download the PDF file
+        response = requests.get(pdf_url)
+        pdf_path = os.path.join(output_folder, "temp.pdf")
+        with open(pdf_path, 'wb') as f:
+            f.write(response.content)
+
+        # Open the PDF file
+        pdf_document = fitz.open(pdf_path)
+        images = []
+
+        # Convert each page to an image and store in the images list
+        for page_number in range(len(pdf_document)):
+            page = pdf_document.load_page(page_number)  # Load the page
+            pix = page.get_pixmap()  # Render the page to an image
+            image = Image.open(io.BytesIO(pix.tobytes("png")))  # Convert pixmap to PIL Image
+            images.append(image)
+
+        # Calculate the total height of the combined image
+        total_height = sum(image.height for image in images)
+        max_width = max(image.width for image in images)
+
+        # Create a new blank image with the appropriate size
+        combined_image = Image.new('RGB', (max_width, total_height))
+
+        # Paste each image into the combined image
+        y_offset = 0
+        for image in images:
+            combined_image.paste(image, (0, y_offset))
+            y_offset += image.height
+
+        # Save the combined image
+        combined_image_path = os.path.join(output_folder, combined_image_filename)
+        combined_image.save(combined_image_path)
+
+        return combined_image_path
+    except Exception as e:
+        logging.error(f"An error occurred while converting PDF to combined image: {e}")
+        return None
 
 def process_question_background(question, phone, app):
     # Ensure that we are within the Flask application context
@@ -460,3 +599,4 @@ Your communication should be clear, respectful, and mindful of the knowledge lev
     except Exception as e:
         logging.error(f'An error occurred while processing the image: {e}')
         return f"An error occurred: {str(e)}"
+    
